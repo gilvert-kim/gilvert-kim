@@ -17,12 +17,12 @@
     
     .container { 
       display: grid; 
-      grid-template-columns: 330px 1fr; 
+      grid-template-columns: 340px 1fr; 
       gap: 16px; 
-      max-width: 1250px; 
+      max-width: 1280px; 
       margin: 0 auto; 
     }
-    @media (max-width: 880px) { .container { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
     
     .card { 
       background: #ffffff; 
@@ -32,19 +32,20 @@
       border: 1px solid #e2e8f0; 
     }
     
-    .controls { display: flex; flex-direction: column; gap: 9px; margin-bottom: 12px; }
+    .controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     .ctrl-group { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
     .ctrl-group label { display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
     
     .pairing-box {
-      background: #f1f5f9;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
       border-radius: 8px;
-      padding: 8px 10px;
+      padding: 10px;
       margin-top: 4px;
-      font-size: 12px;
     }
-    .pairing-options { display: flex; gap: 8px; margin-top: 5px; }
-    .pairing-options label { font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 3px; }
+    .pairing-box span { font-weight: 700; color: #1e40af; font-size: 13px; display: block; margin-bottom: 6px; }
+    .pairing-options { display: flex; flex-direction: column; gap: 5px; }
+    .pairing-options label { font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
     
     .slider-box { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; }
     .slider-box label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
@@ -71,7 +72,7 @@
     }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
     
-    .chart-container { position: relative; width: 100%; height: 490px; }
+    .chart-container { position: relative; width: 100%; height: 500px; }
   </style>
 </head>
 <body>
@@ -82,7 +83,6 @@
   </div>
 
   <div class="container">
-    <!-- 좌측: 핵자 볼륨 시각화 및 5대 항 제어판 -->
     <div class="card">
       <div class="controls">
         <div class="ctrl-group">
@@ -97,17 +97,16 @@
         <div class="ctrl-group">
           <label><input type="checkbox" id="chkAsym" checked> <span style="color:#6a1b9a;">4. 대칭 항 (-a_a (A-2Z)^2/A)</span></label>
         </div>
-        <div class="ctrl-group">
-          <label><input type="checkbox" id="chkPair" checked> <span style="color:#0284c7;">5. 짝짓기 항 (±δ)</span></label>
-        </div>
-
-        <!-- 짝짓기 항 세부 선택 -->
-        <div class="pairing-box" id="pairingSubBox">
-          <span style="font-weight:600; color:#334155;">짝짓기 상태 선택:</span>
+        
+        <div class="pairing-box">
+          <span>5. 짝짓기 항 (±δ) 효과 제어</span>
           <div class="pairing-options">
-            <label><input type="radio" name="pairType" value="even-even" checked> 짝-짝 (+δ)</label>
-            <label><input type="radio" name="pairType" value="odd-A"> 홀수A (0)</label>
-            <label><input type="radio" name="pairType" value="odd-odd"> 홀-홀 (-δ)</label>
+            <label><input type="checkbox" id="chkPairBand" checked> <b>3갈래 밴드 동시 표시</b> (짝짝/홀수/홀홀)</label>
+            <div style="font-size: 11px; color: #475569; margin-top: 3px; line-height: 1.4;">
+              • 파란 실선: 짝-짝 핵 (+δ, 가장 안정)<br>
+              • 검은 점선: 홀수-A 핵 (0, 기준)<br>
+              • 빨간 점선: 홀-홀 핵 (-δ, 가장 불안정)
+            </div>
           </div>
         </div>
       </div>
@@ -121,7 +120,7 @@
         <canvas id="nucleusCanvas" width="250" height="250"></canvas>
         <div class="legend-mini">
           <span><span class="dot" style="background:#ff5252;"></span> 양성자 (Z)</span>
-          <span><span class="dot" style="background:#448aff;"></span> 중성자 (N)</span>
+          <span><span class="dot" style="background:#60a5fa;"></span> 중성자 (N)</span>
         </div>
         <div style="color:#94a3b8; font-size:11px; margin-top:4px;">
           핵 반경 R ≈ 1.2 × A^(1/3) fm
@@ -129,7 +128,6 @@
       </div>
     </div>
 
-    <!-- 우측: B/A 결합에너지 곡선 그래프 -->
     <div class="card">
       <div class="chart-container">
         <canvas id="semfChart"></canvas>
@@ -138,7 +136,7 @@
   </div>
 
   <script>
-    // SEMF 표준 파라미터 (MeV)
+    // SEMF 파라미터 (단위: MeV)
     const av = 15.8, as_ = 18.3, ac = 0.714, aa = 23.2, ap = 12.0;
     const A_vals = Array.from({length: 240}, (_, i) => i + 1);
 
@@ -146,13 +144,11 @@
       return Math.round(A / (2 + 0.015 * Math.pow(A, 2/3)));
     }
 
-    function calculateCurve() {
+    function calculateBaseCurve() {
       const incVol = document.getElementById('chkVol').checked;
       const incSurf = document.getElementById('chkSurf').checked;
       const incCoul = document.getElementById('chkCoul').checked;
       const incAsym = document.getElementById('chkAsym').checked;
-      const incPair = document.getElementById('chkPair').checked;
-      const pairType = document.querySelector('input[name="pairType"]:checked').value;
 
       return A_vals.map(A => {
         const Z = getZ(A);
@@ -161,34 +157,74 @@
         if (incSurf) energy -= as_ * Math.pow(A, -1/3);
         if (incCoul) energy -= ac * Math.pow(Z, 2) / Math.pow(A, 4/3);
         if (incAsym) energy -= aa * Math.pow(A - 2*Z, 2) / Math.pow(A, 2);
-        
-        // 짝짓기 항 계산: delta / A = ap / A^(3/2) (또는 A^(4/3))
-        if (incPair) {
-          const deltaPerA = ap / Math.pow(A, 3/2);
-          if (pairType === 'even-even') energy += deltaPerA;
-          else if (pairType === 'odd-odd') energy -= deltaPerA;
-          // odd-A 인 경우 0
-        }
-
         return energy;
       });
     }
 
-    // Chart.js 초기화
-    const ctx = document.getElementById('semfChart').getContext('2d');
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: A_vals,
-        datasets: [{
-          label: '핵자당 결합 에너지 B/A (MeV/nucleon)',
-          data: calculateCurve(),
+    function getDatasets() {
+      const base = calculateBaseCurve();
+      const showBands = document.getElementById('chkPairBand').checked;
+
+      if (!showBands) {
+        return [{
+          label: '결합 에너지 곡선 B/A (기본 합산)',
+          data: base,
           borderColor: '#1e3a8a',
           backgroundColor: 'rgba(30, 58, 138, 0.06)',
           borderWidth: 2.5,
           pointRadius: 0,
           fill: true
-        }]
+        }];
+      }
+
+      // 3갈래 밴드 데이터 계산 (시각적 구분을 위해 A가 작을 때의 짝짓기 효과 명확화)
+      const evenEven = base.map((val, idx) => {
+        const A = A_vals[idx];
+        return val + (ap / Math.pow(A, 3/4)) / A;
+      });
+
+      const oddOdd = base.map((val, idx) => {
+        const A = A_vals[idx];
+        return val - (ap / Math.pow(A, 3/4)) / A;
+      });
+
+      return [
+        {
+          label: '짝-짝 핵 (Even-Even, +δ)',
+          data: evenEven,
+          borderColor: '#0284c7',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          fill: false
+        },
+        {
+          label: '홀수-A 핵 (Odd-A, δ=0 기준)',
+          data: base,
+          borderColor: '#0f172a',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false
+        },
+        {
+          label: '홀-홀 핵 (Odd-Odd, -δ)',
+          data: oddOdd,
+          borderColor: '#e11d48',
+          borderWidth: 2,
+          borderDash: [2, 2],
+          pointRadius: 0,
+          fill: false
+        }
+      ];
+    }
+
+    // Chart.js 그래프 생성
+    const ctx = document.getElementById('semfChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: A_vals,
+        datasets: getDatasets()
       },
       options: {
         responsive: true,
@@ -196,15 +232,23 @@
         scales: {
           x: { 
             title: { display: true, text: '질량수 A (Mass Number)' },
-            ticks: { maxTicksLimit: 12 }
+            ticks: { maxTicksLimit: 14 }
           },
           y: { 
             title: { display: true, text: 'Binding Energy per Nucleon (MeV/A)' },
             min: -10, max: 18
           }
+        },
+        plugins: {
+          legend: { position: 'top' }
         }
       }
     });
+
+    function updateChart() {
+      chart.data.datasets = getDatasets();
+      chart.update();
+    }
 
     // 2D 핵자 볼륨 캔버스 렌더링
     const cvs = document.getElementById('nucleusCanvas');
@@ -254,12 +298,9 @@
       }
     }
 
-    // 변경 이벤트 등록
+    // 제어 이벤트
     document.querySelectorAll('.controls input').forEach(input => {
-      input.addEventListener('change', () => {
-        chart.data.datasets[0].data = calculateCurve();
-        chart.update();
-      });
+      input.addEventListener('change', updateChart);
     });
 
     const rngA = document.getElementById('rngA');
