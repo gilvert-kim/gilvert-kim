@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>SEMF Interactive Curve</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 10px; background: #ffffff; }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 13px; }
+    .controls label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .chart-container { position: relative; width: 100%; height: 380px; }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <label><input type="checkbox" id="chkVol" checked> <b>부피 항</b> (+a_v)</label>
+    <label><input type="checkbox" id="chkSurf" checked> <b>표면 항</b> (-a_s)</label>
+    <label><input type="checkbox" id="chkCoul" checked> <b>쿨롱 항</b> (-a_c)</label>
+    <label><input type="checkbox" id="chkAsym" checked> <b>대칭 항</b> (-a_a)</label>
+  </div>
+  <div class="chart-container">
+    <canvas id="semfChart"></canvas>
+  </div>
+
+  <script>
+    const av = 15.8, as_ = 18.3, ac = 0.714, aa = 23.2;
+    const A_vals = Array.from({length: 240}, (_, i) => i + 1);
+    
+    function calculateData() {
+      const incVol = document.getElementById('chkVol').checked;
+      const incSurf = document.getElementById('chkSurf').checked;
+      const incCoul = document.getElementById('chkCoul').checked;
+      const incAsym = document.getElementById('chkAsym').checked;
+
+      return A_vals.map(A => {
+        const Z = A / (2 + 0.015 * Math.pow(A, 2/3));
+        let energy = 0;
+        if (incVol) energy += av;
+        if (incSurf) energy -= as_ * Math.pow(A, -1/3);
+        if (incCoul) energy -= ac * Math.pow(Z, 2) / Math.pow(A, 4/3);
+        if (incAsym) energy -= aa * Math.pow(A - 2*Z, 2) / Math.pow(A, 2);
+        return energy;
+      });
+    }
+
+    const ctx = document.getElementById('semfChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: A_vals,
+        datasets: [{
+          label: '핵자당 결합 에너지 B/A (MeV/nucleon)',
+          data: calculateData(),
+          borderColor: '#1976d2',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { title: { display: true, text: '질량수 A (Mass Number)' }, ticks: { maxTicksLimit: 12 } },
+          y: { title: { display: true, text: 'Energy (MeV/A)' }, min: -10, max: 18 }
+        }
+      }
+    });
+
+    document.querySelectorAll('.controls input').forEach(input => {
+      input.addEventListener('change', () => {
+        chart.data.datasets[0].data = calculateData();
+        chart.update();
+      });
+    });
+  </script>
+</body>
+</html>
